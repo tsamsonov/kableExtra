@@ -7,7 +7,7 @@
 #' specify column styles, you should use `column_spec` before `collapse_rows`.
 #'
 #' @param kable_input Output of `knitr::kable()` with `format` specified
-#' @param columns A numeric value or vector indicating in which column(s) rows 
+#' @param columns A numeric value or vector indicating in which column(s) rows
 #' need to be collapsed.
 #' @param valign Select from "top", "middle"(default), "bottom". The reason why
 #' "top" is not default is that the multirow package on CRAN win-builder is
@@ -55,6 +55,87 @@ collapse_rows <- function(kable_input, columns = NULL,
       row_group_label_position, row_group_label_fonts, custom_latex_hline,
       headers_to_remove))
   }
+}
+
+
+#' Collapse repeated rows in table header to multirow table header cells
+#'
+#' @param kable_input Output of `knitr::kable()` with `format` specified
+#' @param columns A numeric value or vector indicating in which column(s) rows
+#' need to be collapsed.
+#' @param valign Select from "top", "middle"(default), "bottom". The reason why
+#' "top" is not default is that the multirow package on CRAN win-builder is
+#' not up to date.
+#'
+#' @return HTML table
+#' @export
+#'
+#' @examples
+collapse_header_rows_html <- function(kable_input, columns = NULL,
+                                      valign = c("middle", "top", "bottom")){
+  kable_attrs <- attributes(kable_input)
+
+  # if only one row in header then nothing can be collapsed
+  if (is.null(kable_attrs$header_above)) {
+    return(kable_input)
+  }
+
+  kable_xml <- read_kable_as_xml(kable_input)
+  kable_thead <- xml_tpart(kable_xml, "thead")
+
+  print(kable_thead)
+
+  kable_dt <- rvest::html_table(xml2::read_html(as.character(kable_input)))[[1]]
+
+  if (is.null(columns)) {
+    columns <- seq(1, length(colnames(kable_dt)))
+  }
+
+  new_names = paste0("col", 1:ncol(kable_dt))
+
+  print(new_names)
+
+  header <- kable_dt %>%
+    colnames()
+
+  names(header) <- new_names
+  names(kable_dt) <- new_names
+
+  kable_dt <- kable_dt %>%
+    dplyr::slice(1:kable_attrs$header_above) %>%
+    { dplyr::bind_rows(header, .) }
+
+  print(kable_dt)
+
+  kable_dt$row_id <- seq(nrow(kable_dt))
+  collapse_matrix <- collapse_row_matrix(kable_dt, columns)
+
+  for (i in 1:nrow(collapse_matrix)) {
+    matrix_row <- collapse_matrix[i, ]
+    names(matrix_row) <- names(collapse_matrix)
+    target_row <- xml_child(kable_thead, i)
+    row_node_rm_count <- 0
+    for (j in 1:length(matrix_row)) {
+      collapsing_col <- as.numeric(sub("x", "", names(matrix_row)[j])) -
+        row_node_rm_count
+      target_cell <- xml_child(target_row, collapsing_col)
+      if (matrix_row[j] == 0) {
+        xml_remove(target_cell)
+        row_node_rm_count <- row_node_rm_count + 1
+      } else if (matrix_row[j] != 1) {
+        xml_attr(target_cell, "rowspan") <- matrix_row[j]
+        xml_attr(target_cell, "style") <- paste0(
+          xml_attr(target_cell, "style"),
+          "vertical-align: ", valign, " !important;")
+      }
+    }
+  }
+
+  out <- as_kable_xml(kable_xml)
+  attributes(out) <- kable_attrs
+  if (!"kableExtra" %in% class(out)) class(out) <- c("kableExtra", class(out))
+  return(out)
+
 }
 
 collapse_rows_html <- function(kable_input, columns, valign) {
