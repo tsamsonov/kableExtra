@@ -121,10 +121,15 @@ collapse_header_rows_html <- function(kable_input, columns = NULL,
       collapsing_col <- as.numeric(sub("x", "", names(matrix_row)[j])) -
         row_node_rm_count - add_colspan
 
+      print(c(i, j, collapsing_col, add_colspan))
+      print(target_row)
+
       target_cell <- xml_child(target_row, collapsing_col)
 
-      colspan <- xml_attr(target_cell, "colspan")
-      add_colspan <- add_colspan + ifelse(is.na(colspan), 1, as.integer(colspan)) - 1
+      colspan <- xml_attr(target_cell, "colspan") %>%
+        { ifelse(is.na(.), 1, as.integer(.)) }
+
+      add_colspan <- add_colspan + colspan - 1
 
       if (matrix_row[j] == 0) {
         xml_remove(target_cell)
@@ -136,7 +141,7 @@ collapse_header_rows_html <- function(kable_input, columns = NULL,
           "vertical-align: ", valign, " !important;")
       }
 
-      j = j + add_colspan + 1
+      j = j + colspan
     }
   }
 
