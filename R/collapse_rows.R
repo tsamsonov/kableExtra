@@ -83,8 +83,6 @@ collapse_header_rows_html <- function(kable_input, columns = NULL,
   kable_xml <- read_kable_as_xml(kable_input)
   kable_thead <- xml_tpart(kable_xml, "thead")
 
-  print(kable_thead)
-
   kable_dt <- rvest::html_table(xml2::read_html(as.character(kable_input)))[[1]]
 
   if (is.null(columns)) {
@@ -105,20 +103,29 @@ collapse_header_rows_html <- function(kable_input, columns = NULL,
     dplyr::slice(1:kable_attrs$header_above) %>%
     { dplyr::bind_rows(header, .) }
 
-  print(kable_dt)
-
-  kable_dt$row_id <- seq(nrow(kable_dt))
+  kable_dt$row_id <- seq(1, nrow(kable_dt))
   collapse_matrix <- collapse_row_matrix(kable_dt, columns)
+
+  print(kable_dt)
+  print(collapse_matrix)
 
   for (i in 1:nrow(collapse_matrix)) {
     matrix_row <- collapse_matrix[i, ]
     names(matrix_row) <- names(collapse_matrix)
     target_row <- xml_child(kable_thead, i)
     row_node_rm_count <- 0
-    for (j in 1:length(matrix_row)) {
+    add_colspan <- 0
+    j <- 1
+    while (j <= ncol(matrix_row)) {
+
       collapsing_col <- as.numeric(sub("x", "", names(matrix_row)[j])) -
-        row_node_rm_count
+        row_node_rm_count - add_colspan
+
       target_cell <- xml_child(target_row, collapsing_col)
+
+      colspan <- xml_attr(target_cell, "colspan")
+      add_colspan <- add_colspan + ifelse(is.na(colspan), 1, as.integer(colspan)) - 1
+
       if (matrix_row[j] == 0) {
         xml_remove(target_cell)
         row_node_rm_count <- row_node_rm_count + 1
@@ -128,8 +135,12 @@ collapse_header_rows_html <- function(kable_input, columns = NULL,
           xml_attr(target_cell, "style"),
           "vertical-align: ", valign, " !important;")
       }
+
+      j = j + add_colspan + 1
     }
   }
+
+  print(collapse_matrix)
 
   out <- as_kable_xml(kable_xml)
   attributes(out) <- kable_attrs
@@ -191,8 +202,9 @@ collapse_row_matrix <- function(kable_dt, columns, html = T)  {
   mapping_matrix <- list()
   for (i in columns) {
     mapping_matrix[[paste0("x", i)]] <- unlist(lapply(
-      rle(kable_dt[, i])$lengths, column_block))
+      rle(dplyr::pull(kable_dt, i))$lengths, column_block))
   }
+
   mapping_matrix <- data.frame(mapping_matrix)
   return(mapping_matrix)
 }
