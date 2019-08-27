@@ -91,8 +91,6 @@ collapse_header_rows_html <- function(kable_input, columns = NULL,
 
   new_names = paste0("col", 1:ncol(kable_dt))
 
-  print(new_names)
-
   header <- kable_dt %>%
     colnames()
 
@@ -106,10 +104,9 @@ collapse_header_rows_html <- function(kable_input, columns = NULL,
   kable_dt$row_id <- seq(1, nrow(kable_dt))
   collapse_matrix <- collapse_row_matrix(kable_dt, columns)
 
-  print(kable_dt)
-  print(collapse_matrix)
+  nrows = nrow(collapse_matrix)
 
-  for (i in 1:nrow(collapse_matrix)) {
+  for (i in 1:nrows) {
     matrix_row <- collapse_matrix[i, ]
     names(matrix_row) <- names(collapse_matrix)
     target_row <- xml_child(kable_thead, i)
@@ -120,9 +117,6 @@ collapse_header_rows_html <- function(kable_input, columns = NULL,
 
       collapsing_col <- as.numeric(sub("x", "", names(matrix_row)[j])) -
         row_node_rm_count - add_colspan
-
-      print(c(i, j, collapsing_col, add_colspan))
-      print(target_row)
 
       target_cell <- xml_child(target_row, collapsing_col)
 
@@ -136,16 +130,22 @@ collapse_header_rows_html <- function(kable_input, columns = NULL,
         row_node_rm_count <- row_node_rm_count + 1
       } else if (matrix_row[j] != 1) {
         xml_attr(target_cell, "rowspan") <- matrix_row[j]
-        xml_attr(target_cell, "style") <- paste0(
-          xml_attr(target_cell, "style"),
-          "vertical-align: ", valign, " !important;")
+        if(matrix_row[j] + i - 1 == nrows) {
+          header_template_cell <- xml_child(xml_child(kable_thead, nrows), 1)
+          xml_attr(target_cell, "style") <- xml_attr(header_template_cell, "style")
+        } else {
+          xml_attr(target_cell, "style") <- paste0(
+            xml_attr(target_cell, "style"),
+            "vertical-align: ", valign, " !important;"
+          )
+        }
       }
 
       j = j + colspan
     }
   }
 
-  print(collapse_matrix)
+  print(as.character(kable_thead))
 
   out <- as_kable_xml(kable_xml)
   attributes(out) <- kable_attrs
