@@ -133,6 +133,9 @@ collapse_header_rows_html <- function(kable_input, columns = NULL,
         if(matrix_row[j] + i - 1 == nrows) {
           header_template_cell <- xml_child(xml_child(kable_thead, nrows), 1)
           xml_attr(target_cell, "style") <- xml_attr(header_template_cell, "style")
+          target_cell_contents = xml_text(xml_child(target_cell, 1))
+          xml_remove(xml_child(target_cell, 1))
+          xml_text(target_cell) <- target_cell_contents
         } else {
           xml_attr(target_cell, "style") <- paste0(
             xml_attr(target_cell, "style"),
